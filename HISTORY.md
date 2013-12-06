@@ -1,3 +1,18 @@
+## 1.26.0 (TBD)
+
+ * FIX: use Socket.hostname instead of shelling out in order to avoid
+   errors caused when too many workers are started simultaneously. #1152
+   Backport of fix from 2.x master. (@hone, @RunsFor)
+ * FIX: infinite recusion when applying a workaround to make resque
+   backwards-compatible with <= 1.24. #1150 (@yaauie)
+ * FIX: add/fix test coverage for worker pruning and be a little more
+   aggressive in what we prune. (@yaauie)
+ * FIX: require yaml library for show_args support in resque-web. #1143
+   (@yaauie)
+ * FIX: README and documentation link fixes. #1130 (@cade)
+ * Feature: implementation of Backend connection with Hash, using the same
+   connection hash supported by redis-rb #1140 (@lucidstack)
+
 ## 1.25.1 (2013-9-26)
 
 * Actually require Forwardable from the standard library.
