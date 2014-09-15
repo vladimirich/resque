@@ -46,7 +46,15 @@ namespace :resque do
   task :workers do
     threads = []
 
-    ENV['COUNT'].to_i.times do
+    worker_count = ENV['COUNT']
+    worker_queue = ENV['QUEUE']
+    unless (worker_count && !worker_count.empty?) &&
+           (worker_queue && !worker_queue.empty?)
+      abort('set COUNT and QUEUE env vars, ' +
+            'e.g., $ QUEUE=hi,lo COUNT=3 rake resque:workers' )
+    end
+
+    worker_count.to_i.times do
       threads << Thread.new do
         system "rake resque:work"
       end
