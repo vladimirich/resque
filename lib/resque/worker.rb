@@ -54,12 +54,15 @@ module Resque
     # registered in the application. Otherwise, forked workers exit with `exit!`
     attr_accessor :run_at_exit_hooks
 
+    attr_accessor :live_interval
+
     attr_writer :to_s
     attr_writer :pid
 
     # Returns an array of all worker objects.
     def self.all
-      Array(redis.smembers(:workers)).map { |id| find(id) }.compact
+      redis.zremrangebyscore("live_workers", 0, (Time.now-60).to_i)
+      Array(redis.zrange("live_workers", 0, -1)).map { |id| find(id) }.compact
     end
 
     # Returns an array of all worker objects currently processing
@@ -110,7 +113,7 @@ module Resque
     # Given a string worker id, return a boolean indicating whether the
     # worker exists
     def self.exists?(worker_id)
-      redis.sismember(:workers, worker_id)
+      redis.zrank('live_workers', worker_id)
     end
 
     # Workers should be initialized with an array of string queue
@@ -128,6 +131,7 @@ module Resque
       @queues = queues.map { |queue| queue.to_s.strip }
       @shutdown = nil
       @paused = nil
+      @live_interval = 60
       validate_queues
     end
 
@@ -200,6 +204,8 @@ module Resque
           @child = nil
         else
           break if interval.zero?
+          self.live_interval = self.live_interval - interval
+          queue_living if self.live_interval <= 0
           log! "Sleeping for #{interval} seconds"
           procline paused? ? "Paused" : "Waiting for #{@queues.join(',')}"
           sleep interval
@@ -521,7 +527,7 @@ module Resque
     # lifecycle on startup.
     def register_worker
       redis.pipelined do
-        redis.sadd(:workers, self)
+        redis.zadd("live_workers", Time.now.to_i, to_s)
         started!
       end
     end
@@ -551,7 +557,7 @@ module Resque
       end
 
       redis.pipelined do
-        redis.srem(:workers, self)
+        redis.zrem('live_workers', self)
         redis.del("worker:#{self}")
         redis.del("worker:#{self}:started")
 
@@ -714,6 +720,11 @@ module Resque
     def procline(string)
       $0 = "#{ENV['RESQUE_PROCLINE_PREFIX']}resque-#{Resque::Version}: #{string}"
       log! $0
+    end
+
+    def queue_living
+      redis.zadd("live_workers", Time.now.to_i, to_s)
+      self.live_interval = 60
     end
 
     # Log a message to Resque.logger
