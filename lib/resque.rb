@@ -218,10 +218,51 @@ module Resque
   end
 
   # Pops a job off a queue. Queue name should be a string.
-  #
-  # Returns a Ruby object.
+  # TODO fix tests
   def pop(queue)
-    decode redis.lpop("queue:#{queue}")
+    t = Time.now.to_f
+    waiting_jobs = redis.lrange("queue:#{queue}", 0, -1).map { |el| decode(el) }.sort { |j1, j2| j2['args'].first['priority'].to_i <=> j1['args'].first['priority'].to_i }
+    return if waiting_jobs.empty?
+    logger.debug "Time to get jobs: #{Time.now.to_f - t}"
+    begin
+      users_weights = {}
+      for i in 0...waiting_jobs.count
+        users_weights[waiting_jobs[i]['args'].first['user_id']] = waiting_jobs[i]['args'].first['user_weight']
+      end
+    rescue NoMethodError => e
+      logger.error e.message
+      logger.debug users_weights
+      logger.debug waiting_jobs
+    end
+
+    # Если ожидает больше одного пользователя - определяем очередной job на основе weight пользователя
+    if users_weights.count > 1
+      logger.debug "users_weights.count: #{users_weights.count}"
+      # NOTE delete_if(&:blank) нужен чтобы отсеять nil и {}
+      working_jobs = Worker.working.select { |worker| worker.queues.include?(queue) }.map(&:job).delete_if(&:blank?).map { |job| job['payload']['args'].first }
+      logger.debug "working_jobs: #{working_jobs}"
+      users_weights = Hash[*working_jobs.map { |job| [job['user_id'], job['user_weight']] }.flatten].merge(users_weights)
+      logger.debug "users_weights: #{users_weights}"
+      users_max_workers = {}
+      for i in 0...waiting_jobs.count
+        job = waiting_jobs[i]
+        user_id = job['args'].first['user_id']
+        unless users_max_workers[user_id]
+          users_max_workers[user_id] = (users_weights[user_id].to_f / users_weights.values.sum * Worker.all.select { |worker| worker.queues.include?(queue) }.count).floor
+          if working_jobs.select { |j| j['user_id'] == user_id }.count + 1 <= users_max_workers[user_id]
+            return job if redis.lrem("queue:#{queue}", 0, encode(job)) > 0
+          end
+        end
+      end
+      logger.debug "users_max_workers: #{users_max_workers}"
+    end
+
+    # Берем очередной job
+    for i in 0...waiting_jobs.count
+      job = waiting_jobs[i]
+      return job if redis.lrem("queue:#{queue}", 0, encode(job)) > 0
+    end
+    nil
   end
 
   # Returns an integer representing the size of a queue.

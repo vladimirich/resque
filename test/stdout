@@ -1,0 +1,4 @@
+98357:M 02 Jun 10:18:43.545 - DB 0: 6 keys (0 volatile) in 16 slots HT.
+98357:M 02 Jun 10:18:43.545 - 0 clients connected (0 slaves), 958928 bytes in use
+98357:M 02 Jun 10:18:48.586 - DB 0: 6 keys (0 volatile) in 16 slots HT.
+98357:M 02 Jun 10:18:48.595 - 0 clients connected (0 slaves), 958928 bytes in use

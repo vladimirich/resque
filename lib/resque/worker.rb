@@ -386,8 +386,6 @@ module Resque
       rescue ArgumentError
         warn "Signals QUIT, USR1, USR2, and/or CONT not supported."
       end
-
-      log! "Registered signals"
     end
 
     def unregister_signal_handlers
@@ -733,8 +731,8 @@ module Resque
       info(message)
     end
 
+    # do not display debug messages
     def log!(message)
-      debug(message)
     end
 
     # Deprecated legacy methods for controlling the logging threshhold
