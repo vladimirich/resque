@@ -221,7 +221,12 @@ module Resque
   # TODO fix tests
   def pop(queue)
     t = Time.now.to_f
-    waiting_jobs = redis.lrange("queue:#{queue}", 0, -1).map { |el| decode(el) }.sort { |j1, j2| j2['args'].first['priority'].to_i <=> j1['args'].first['priority'].to_i }
+    waiting_jobs = redis.lrange("queue:#{queue}", 0, -1).map { |j| decode(j) }
+    # NOTE для общих очередей (не конкретного хоста) отсеиваем job-ы уже выполнявшиеся на этом хосте
+    unless queue.start_with?(Socket.gethostname)
+      waiting_jobs.reject! { |j| j['args'].first['hosts'] && j['args'].first['hosts'].split(',').include?(Socket.gethostname) }
+    end
+    waiting_jobs.sort! { |j1, j2| j2['args'].first['priority'].to_i <=> j1['args'].first['priority'].to_i }
     return if waiting_jobs.empty?
     logger.debug "Time to get jobs: #{Time.now.to_f - t}"
     begin
