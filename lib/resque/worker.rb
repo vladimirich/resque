@@ -525,7 +525,7 @@ module Resque
     # lifecycle on startup.
     def register_worker
       redis.pipelined do
-        redis.zadd("live_workers", Time.now.to_i, self)
+        redis.zadd("live_workers", Time.now.to_i, to_s)
         started!
       end
     end
