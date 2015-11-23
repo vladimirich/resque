@@ -12,8 +12,6 @@ module Resque
   class Worker
     include Resque::Logging
 
-    WORKER_CHECK_INTERVAL = 60
-
     def redis
       Resque.redis
     end
@@ -63,7 +61,7 @@ module Resque
 
     # Returns an array of all worker objects.
     def self.all
-      redis.zremrangebyscore("live_workers", 0, (Time.now - WORKER_CHECK_INTERVAL).to_i)
+      redis.zremrangebyscore("live_workers", 0, (Time.now-60).to_i)
       Array(redis.zrange("live_workers", 0, -1)).map { |id| find(id) }.compact
     end
 
@@ -133,7 +131,7 @@ module Resque
       @queues = queues.map { |queue| queue.to_s.strip }
       @shutdown = nil
       @paused = nil
-      reset_live_interval
+      @live_interval = 60
       validate_queues
     end
 
@@ -723,8 +721,8 @@ module Resque
     end
 
     def queue_living
-      redis.zadd("live_workers", Time.now.to_i, self)
-      reset_live_interval
+      redis.zadd("live_workers", Time.now.to_i, to_s)
+      self.live_interval = 60
     end
 
     # Log a message to Resque.logger
@@ -785,10 +783,5 @@ module Resque
       $warned_logger_severity_deprecation = true
       nil
     end
-
-    def reset_live_interval
-      self.live_interval = WORKER_CHECK_INTERVAL
-    end
-
   end
 end
