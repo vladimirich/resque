@@ -133,7 +133,6 @@ module Resque
       @queues = queues.map { |queue| queue.to_s.strip }
       @shutdown = nil
       @paused = nil
-      reset_live_interval
       validate_queues
     end
 
@@ -170,9 +169,8 @@ module Resque
 
       Thread.new do
         loop do
-          self.live_interval = self.live_interval - interval
-          queue_living if self.live_interval <= 0
-          sleep interval
+          queue_living
+          sleep WORKER_CHECK_INTERVAL
         end
       end
 
@@ -730,7 +728,6 @@ module Resque
 
     def queue_living
       redis.zadd("live_workers", Time.now.to_i, self)
-      reset_live_interval
     end
 
     # Log a message to Resque.logger
@@ -790,10 +787,6 @@ module Resque
       Kernel.warn "Called from: #{caller[0..5].join("\n\t")}"
       $warned_logger_severity_deprecation = true
       nil
-    end
-
-    def reset_live_interval
-      self.live_interval = WORKER_CHECK_INTERVAL
     end
 
   end
